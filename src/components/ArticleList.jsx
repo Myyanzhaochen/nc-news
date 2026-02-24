@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 function ArticleList() {
   const [articles, setArticles] = useState([]);
@@ -38,7 +39,9 @@ function ArticleList() {
           }}
         >
           <img src={article.article_img_url} alt={article.title} width="200" />
-          <h2>{article.title}</h2>
+          <h2>
+            <Link to={`/articles/${article.article_id}`}>{article.title}</Link>
+          </h2>
           <p>
             By {article.author} | Topic: {article.topic}
           </p>
