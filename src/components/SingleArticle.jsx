@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
+const loggedInUser = "cooljmessy";
+const BASE_URL = "https://nc-news-be-6q9q.onrender.com";
+
 function SingleArticle() {
   const { article_id } = useParams();
 
@@ -8,11 +11,17 @@ function SingleArticle() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [comments, setComments] = useState([]);
+  const [voteError, setVoteError] = useState(null);
+  const [voteChange, setVoteChange] = useState(0);
+
+  const [newComment, setNewComment] = useState("");
+  const [isPosting, setIsPosting] = useState(false);
+  const [postError, setPostError] = useState(null);
 
   useEffect(() => {
     setIsLoading(true);
 
-    fetch(`https://nc-news-be-6q9q.onrender.com/api/articles/${article_id}`)
+    fetch(`${BASE_URL}/api/articles/${article_id}`)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch article");
         return res.json();
@@ -22,9 +31,7 @@ function SingleArticle() {
       })
       .catch((err) => setError(err.message));
 
-    fetch(
-      `https://nc-news-be-6q9q.onrender.com/api/articles/${article_id}/comments`,
-    )
+    fetch(`${BASE_URL}/api/articles/${article_id}/comments`)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch comments");
         return res.json();
@@ -38,6 +45,55 @@ function SingleArticle() {
         setIsLoading(false);
       });
   }, [article_id]);
+
+  function handleVote(change) {
+    setVoteError(null);
+    setVoteChange((current) => current + change);
+
+    fetch(`${BASE_URL}/api/articles/${article_id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inc_votes: change }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Vote failed");
+      })
+      .catch(() => {
+        setVoteChange((current) => current - change);
+        setVoteError("Vote failed — please try again.");
+      });
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+
+    if (!newComment.trim()) return;
+
+    setIsPosting(true);
+    setPostError(null);
+
+    fetch(`${BASE_URL}/api/articles/${article_id}/comments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: loggedInUser,
+        body: newComment,
+      }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to post comment");
+        return res.json();
+      })
+      .then((data) => {
+        setComments((current) => [data.comment, ...current]);
+        setNewComment("");
+        setIsPosting(false);
+      })
+      .catch(() => {
+        setPostError("Comment failed to post");
+        setIsPosting(false);
+      });
+  }
 
   if (isLoading) return <p>Loading...</p>;
   if (error) return <p>Error: {error}</p>;
@@ -55,7 +111,29 @@ function SingleArticle() {
 
       <p>{article.body}</p>
 
-      <p>Votes: {article.votes}</p>
+      <p>Votes: {article.votes + voteChange}</p>
+
+      <div>
+        <button onClick={() => handleVote(1)}>+</button>
+        <button onClick={() => handleVote(-1)}>-</button>
+      </div>
+
+      {voteError && <p style={{ color: "red" }}>{voteError}</p>}
+
+      <h3>Add Comment</h3>
+
+      <form onSubmit={handleSubmit}>
+        <textarea
+          value={newComment}
+          onChange={(e) => setNewComment(e.target.value)}
+          placeholder="Write your comment..."
+        />
+        <br />
+        <button type="submit" disabled={isPosting}>
+          {isPosting ? "Posting..." : "Post Comment"}
+        </button>
+        {postError && <p style={{ color: "red" }}>{postError}</p>}
+      </form>
 
       <h3>Comments</h3>
 
