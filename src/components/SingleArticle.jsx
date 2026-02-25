@@ -1,43 +1,53 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
-const loggedInUser = "cooljmessy";
 const BASE_URL = "https://nc-news-be-6q9q.onrender.com";
+const loggedInUser = "cooljmessy";
 
 function SingleArticle() {
   const { article_id } = useParams();
 
+  // ARTICLE STATE
   const [article, setArticle] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // COMMENTS STATE
   const [comments, setComments] = useState([]);
+
+  // VOTING STATE
   const [voteError, setVoteError] = useState(null);
   const [voteChange, setVoteChange] = useState(0);
 
+  // POST COMMENT STATE
   const [newComment, setNewComment] = useState("");
   const [isPosting, setIsPosting] = useState(false);
   const [postError, setPostError] = useState(null);
 
+  // DELETE STATE
+  const [deleteError, setDeleteError] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+
+  // =========================
+  // FETCH ARTICLE + COMMENTS
+  // =========================
   useEffect(() => {
     setIsLoading(true);
+    setError(null);
 
-    fetch(`${BASE_URL}/api/articles/${article_id}`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch article");
-        return res.json();
-      })
-      .then((data) => {
-        setArticle(data.article);
-      })
-      .catch((err) => setError(err.message));
+    Promise.all([
+      fetch(`${BASE_URL}/api/articles/${article_id}`),
+      fetch(`${BASE_URL}/api/articles/${article_id}/comments`),
+    ])
+      .then(async ([articleRes, commentsRes]) => {
+        if (!articleRes.ok) throw new Error("Failed to fetch article");
+        if (!commentsRes.ok) throw new Error("Failed to fetch comments");
 
-    fetch(`${BASE_URL}/api/articles/${article_id}/comments`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch comments");
-        return res.json();
-      })
-      .then((data) => {
-        setComments(data.comments);
+        const articleData = await articleRes.json();
+        const commentsData = await commentsRes.json();
+
+        setArticle(articleData.article);
+        setComments(commentsData.comments);
         setIsLoading(false);
       })
       .catch((err) => {
@@ -46,6 +56,9 @@ function SingleArticle() {
       });
   }, [article_id]);
 
+  // =========================
+  // HANDLE VOTE
+  // =========================
   function handleVote(change) {
     setVoteError(null);
     setVoteChange((current) => current + change);
@@ -64,6 +77,9 @@ function SingleArticle() {
       });
   }
 
+  // =========================
+  // HANDLE POST COMMENT
+  // =========================
   function handleSubmit(e) {
     e.preventDefault();
 
@@ -74,7 +90,9 @@ function SingleArticle() {
 
     fetch(`${BASE_URL}/api/articles/${article_id}/comments`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         username: loggedInUser,
         body: newComment,
@@ -95,6 +113,34 @@ function SingleArticle() {
       });
   }
 
+  // =========================
+  // HANDLE DELETE COMMENT
+  // =========================
+  function handleDelete(comment_id) {
+    setDeleteError(null);
+    setDeletingId(comment_id);
+
+    fetch(`${BASE_URL}/api/comments/${comment_id}`, {
+      method: "DELETE",
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Delete failed");
+
+        setComments((current) =>
+          current.filter((comment) => comment.comment_id !== comment_id),
+        );
+
+        setDeletingId(null);
+      })
+      .catch(() => {
+        setDeleteError("Delete failed — please try again.");
+        setDeletingId(null);
+      });
+  }
+
+  // =========================
+  // RENDER STATES
+  // =========================
   if (isLoading) return <p>Loading...</p>;
   if (error) return <p>Error: {error}</p>;
   if (!article) return <p>Article not found</p>;
@@ -113,12 +159,12 @@ function SingleArticle() {
 
       <p>Votes: {article.votes + voteChange}</p>
 
-      <div>
-        <button onClick={() => handleVote(1)}>+</button>
-        <button onClick={() => handleVote(-1)}>-</button>
-      </div>
+      <button onClick={() => handleVote(1)}>+</button>
+      <button onClick={() => handleVote(-1)}>-</button>
 
       {voteError && <p style={{ color: "red" }}>{voteError}</p>}
+
+      <hr />
 
       <h3>Add Comment</h3>
 
@@ -126,14 +172,18 @@ function SingleArticle() {
         <textarea
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
-          placeholder="Write your comment..."
+          rows="4"
+          cols="50"
         />
         <br />
         <button type="submit" disabled={isPosting}>
           {isPosting ? "Posting..." : "Post Comment"}
         </button>
-        {postError && <p style={{ color: "red" }}>{postError}</p>}
       </form>
+
+      {postError && <p style={{ color: "red" }}>{postError}</p>}
+
+      <hr />
 
       <h3>Comments</h3>
 
@@ -155,9 +205,20 @@ function SingleArticle() {
             <p>{new Date(comment.created_at).toLocaleDateString()}</p>
             <p>{comment.body}</p>
             <p>Votes: {comment.votes}</p>
+
+            {comment.author === loggedInUser && (
+              <button
+                onClick={() => handleDelete(comment.comment_id)}
+                disabled={deletingId === comment.comment_id}
+              >
+                {deletingId === comment.comment_id ? "Deleting..." : "Delete"}
+              </button>
+            )}
           </div>
         ))
       )}
+
+      {deleteError && <p style={{ color: "red" }}>{deleteError}</p>}
     </div>
   );
 }
