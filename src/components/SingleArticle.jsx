@@ -83,7 +83,10 @@ function SingleArticle() {
   function handleSubmit(e) {
     e.preventDefault();
 
-    if (!newComment.trim()) return;
+    if (!newComment.trim()) {
+      setPostError("Comment cannot be empty.");
+      return;
+    }
 
     setIsPosting(true);
     setPostError(null);
@@ -142,7 +145,14 @@ function SingleArticle() {
   // RENDER STATES
   // =========================
   if (isLoading) return <p>Loading...</p>;
-  if (error) return <p>Error: {error}</p>;
+  if (error) {
+    return (
+      <div>
+        <h2>Article Not Found</h2>
+        <p>Please check the URL and try again.</p>
+      </div>
+    );
+  }
   if (!article) return <p>Article not found</p>;
 
   return (

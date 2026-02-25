@@ -42,7 +42,14 @@ function ArticleList() {
   }, [topic, sort_by, order]);
 
   if (isLoading) return <p>Loading...</p>;
-  if (error) return <p>Error: {error}</p>;
+  if (error) {
+    return (
+      <div>
+        <h2>Topic Not Found</h2>
+        <p>The selected topic does not exist.</p>
+      </div>
+    );
+  }
 
   return (
     <div>
